@@ -22,9 +22,6 @@ module.exports = {
     //defaultNetwork: "hardhat",
     networks: {
         hardhat: {
-            chainId: 1337
-        },
-        localhost: {
         },
         kovan: {
             url: KOVAN_RPC_URL,

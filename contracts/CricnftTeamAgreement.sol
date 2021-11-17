@@ -2,47 +2,46 @@
 pragma solidity ^0.8.2;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
 
 /**
  * @title CricNFT Dapp
  * @author Shivali Sharma @ Chainlink Fall Hackathon 2021 
  **/
 
-contract CricnftTeamAgreement is ChainlinkClient, AccessControl {
-    using Chainlink for Chainlink.Request;
-    
-    enum AgreementStatus {invalid, setup, verified, live, ended}
+contract CricnftTeamAgreement is AccessControl {
+        
+    enum AgreementStatus {invalid, setup, live, ended}
     
     struct TeamAgreement {
-        uint id;
+        uint tokenId;
         address publishedAddress;        
         uint teamId;
         uint dollarAmount;
         uint totalNumOfTokenstoMint;
+        uint seasonId;
+        string imageCID;
         AgreementStatus status;
     }
 
-    address public owner;
-    address private oracle;
-    bytes32 private jobId;
-    uint256 private fee; 
-    uint public result;
+    address public owner;  
     uint public agreementId;
+    uint public counter;
 
-    address[] publishedTeamAddresses;
+    address[] public publishedTeamAddresses;
     uint[] teamIds;
     
     mapping (address=>bool) public teamAddresses;
-    mapping (uint=>bool) public teamsInContract;
-    mapping (address => mapping(uint => TeamAgreement)) teams;          //  
+    mapping (uint=> mapping(uint => bool)) public teamsInContract; //TeamId => seasonId => bool
+    mapping (address => mapping(uint => TeamAgreement)) teams;          //  IPL Team Owner => tokenId => TeamAgreement struct
+    mapping (uint => TeamAgreement) upKeepUse;          //  tokenId => TeamAgreement struct
     mapping (address => mapping(uint => bytes32)) teamURI;     //  
 
+    event AddressAdded(address);
+    event NewAgreementCreated(address indexed teamAddress,uint seasonId);
+    event AgreementEnded(address indexed teamAddress, uint seasonId);
+    event NewOwner(address _newowner);
+
     constructor() {
-        setPublicChainlinkToken();
-        oracle = 0x5cBace36c9Eb2016dE3E28b1b036F4E21D6e7e1c; 
-        jobId = "9d6108af73744528a6fb1003a8eb2834"; 
-        fee = 0.1 * 10 ** 18; // (Varies by network and job)
         owner = msg.sender;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(bytes32("TEAM_OWNER_ROLE"), msg.sender); 
@@ -51,6 +50,7 @@ contract CricnftTeamAgreement is ChainlinkClient, AccessControl {
 
     /**
      * @notice Function to set published address of IPL team to allow them to create agreement
+     * @dev For now this function is called by owner of the contract but later should be verfied during create agreement that the address is a valid IPL team address by ENS validation
      * @param _teamAddress address
     */
     function setPublishedAddress(address _teamAddress) external onlyRole(DEFAULT_ADMIN_ROLE){             
@@ -58,7 +58,7 @@ contract CricnftTeamAgreement is ChainlinkClient, AccessControl {
              publishedTeamAddresses.push(_teamAddress);
              teamAddresses[_teamAddress]=true;
              grantRole(bytes32("TEAM_OWNER_ROLE"), _teamAddress);
-             //emit AddressAdded();
+             emit AddressAdded(_teamAddress);
     }
 
     /**
@@ -76,84 +76,78 @@ contract CricnftTeamAgreement is ChainlinkClient, AccessControl {
   @param _teamId uint
   @param _dollarAmount uint
   @param _totalNumOfTokenstoMint uint
+  @param _seasonId uint
+  @param _imageCID string
   **/
 
-    function createTeamAgreement(uint _teamId, uint _dollarAmount, uint _totalNumOfTokenstoMint) 
+    function createTeamAgreement(uint _teamId, uint _dollarAmount, uint _totalNumOfTokenstoMint, uint _seasonId, string calldata _imageCID) 
         external        
         onlyRole(bytes32("TEAM_OWNER_ROLE"))  
     {
         require(teamAddresses[msg.sender]==true,"Not Authorized");
-        require(teamsInContract[_teamId]==false,"Team already in agreement");
+        require(teamsInContract[_teamId][_seasonId]==false,"Team already in agreement for this season");
         require(_totalNumOfTokenstoMint > 0, "Agreement cannot be created with 0 tokens");
         require(_dollarAmount > 0, "Dollar Amount for team NFT cannot be zero");
         
         ++agreementId;
-        TeamAgreement storage agreement = teams[msg.sender][_teamId];
-        agreement.id = agreementId;
+        TeamAgreement storage agreement = teams[msg.sender][agreementId];
+        agreement.tokenId = agreementId;
         agreement.publishedAddress = msg.sender;
         agreement.teamId = _teamId;
         agreement.dollarAmount = _dollarAmount;
         agreement.totalNumOfTokenstoMint = _totalNumOfTokenstoMint;
-        agreement.status = AgreementStatus.setup;               
+        agreement.status = AgreementStatus.setup;
+        agreement.seasonId = _seasonId;
+        agreement.imageCID = _imageCID;               
         teamIds.push(_teamId);
-        teamsInContract[_teamId]=true;        
-        //emit NewAgreementCreated();
+        teamsInContract[_teamId][_seasonId]=true;
+        upKeepUse[agreementId] = agreement;        
+        emit NewAgreementCreated(msg.sender,_seasonId);
     }
 
-function removeAgreement(address _teamAddress, uint _teamId) external onlyRole(DEFAULT_ADMIN_ROLE){
-        //emit AgreementDeleted();
-        delete teams[_teamAddress][_teamId];        
-}
+ /**
+  @notice This function to read the agreement information for given teamaddress and seasonId 
+  @param _teamAddress address
+  @param _tokenId uint
+  **/
 
-function endAgreement(address _teamAddress, uint _teamId) external onlyRole(DEFAULT_ADMIN_ROLE){
-        TeamAgreement storage agreement = teams[_teamAddress][_teamId]; 
-        require(agreement.status== AgreementStatus.setup, "Only agreements in setup status can be ended");     
-        agreement.status = AgreementStatus.ended;       
-        //emit AgreementEnded();
-}
-
-function verfiyAgreement(address _teamAddress, uint _teamId) external onlyRole(DEFAULT_ADMIN_ROLE){
-        TeamAgreement storage agreement = teams[_teamAddress][_teamId];   
-        require(agreement.status== AgreementStatus.setup, "Only agreements in setup status can be verfiied");     
-        agreement.status = AgreementStatus.verified;       
-        //emit AgreementVerified();
-}
-
-function changeOwnership(address _newowner) external onlyRole(DEFAULT_ADMIN_ROLE){
-    owner = _newowner;
-    //emit NewOwner();
-}
-
-function getAgreementInfo(address _teamAddress, uint _teamId) public view returns(uint id, 
+function getAgreementInfo(address _teamAddress, uint _tokenId) public view returns(uint id, 
         address publishedAddress, 
         uint teamId, 
         uint dollarAmount,
         uint totalNumOfTokenstoMint,
+        uint seasonId,
+        string memory imageCID,
         AgreementStatus status) {
-         id = teams[_teamAddress][_teamId].id;
-         publishedAddress = teams[_teamAddress][_teamId].publishedAddress;
-         teamId = teams[_teamAddress][_teamId].teamId;
-         dollarAmount = teams[_teamAddress][_teamId].dollarAmount;
-         totalNumOfTokenstoMint = teams[_teamAddress][_teamId].totalNumOfTokenstoMint;
-         status = teams[_teamAddress][_teamId].status;
+         id = teams[_teamAddress][_tokenId].tokenId;
+         publishedAddress = teams[_teamAddress][_tokenId].publishedAddress;
+         teamId = teams[_teamAddress][_tokenId].teamId;
+         dollarAmount = teams[_teamAddress][_tokenId].dollarAmount;
+         totalNumOfTokenstoMint = teams[_teamAddress][_tokenId].totalNumOfTokenstoMint;
+         seasonId = teams[_teamAddress][_tokenId].seasonId;
+         imageCID = teams[_teamAddress][_tokenId].imageCID;
+         status = teams[_teamAddress][_tokenId].status;
 }
-    
-    function requestIPLTeamData(uint8 _teamId) public returns (bytes32 requestId) 
-    {
-        /*
-        // This will be a generic function to request IPL Info
-        */
-    }
-    
-    
-    function fulfillIPLTeamData(bytes32 _requestId, uint _result) public recordChainlinkFulfillment(_requestId) {        
-        /*
-        // This will be a generic function to fulfill IPL Info       
-        */
-    }
 
-    function setURI(string memory newuri) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        // set mapping teamURI 
-    }
-    
+function getTeamIdInfo(uint _tokenId) public view returns(uint teamId) {
+         return teamId = upKeepUse[_tokenId].teamId;         
+}
+
+function removeAgreement(address _teamAddress, uint _tokenId) external onlyRole(DEFAULT_ADMIN_ROLE){
+        //emit AgreementDeleted();
+        delete teams[_teamAddress][_tokenId];        
+}
+
+function endAgreement(address _teamAddress, uint _tokenId) external onlyRole(DEFAULT_ADMIN_ROLE){
+        TeamAgreement storage agreement = teams[_teamAddress][_tokenId]; 
+        require(agreement.status== AgreementStatus.setup, "Only agreements in setup status can be ended");     
+        agreement.status = AgreementStatus.ended;       
+        emit AgreementEnded(_teamAddress,_tokenId);
+}
+
+function changeOwnership(address _newowner) external onlyRole(DEFAULT_ADMIN_ROLE){
+    owner = _newowner;
+    emit NewOwner(_newowner);
+}
+
 }
