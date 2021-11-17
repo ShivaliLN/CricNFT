@@ -13,13 +13,15 @@ contract CricNFTGenerate is KeeperCompatibleInterface, ChainlinkClient {
     bytes32 private jobId;
     uint256 private fee;
     
-    uint256 public result;
+    uint256 public resultValue;
     string public resultString;
+    uint public upKeepcounter;
 
     mapping(bytes32 => uint) public requestIdTeam;
     mapping(uint => uint) public teamidResult;
     
-    constructor() {
+    constructor(address _teamAddress) {
+        teamAgreement = CricnftTeamAgreement(_teamAddress); 
         setPublicChainlinkToken();
         oracle = 0xc57B33452b4F7BB189bB5AfaE9cc4aBa1f7a4FD8; 
         jobId = "d5270d1c311941d0b08bead21fea7747"; 
@@ -29,7 +31,8 @@ contract CricNFTGenerate is KeeperCompatibleInterface, ChainlinkClient {
     /**
      * Initial request
      */
-    function requestData(uint _teamId) public returns (bytes32 requestId) 
+     //function requestData() public returns (bytes32 requestId) 
+    function requestData(uint _teamId) public returns (bytes32 requestId)     
     {
         Chainlink.Request memory request = buildChainlinkRequest(jobId, address(this), this.fulfill.selector);
         
@@ -42,14 +45,16 @@ contract CricNFTGenerate is KeeperCompatibleInterface, ChainlinkClient {
                        
         // Sends the request
         //return sendChainlinkRequestTo(oracle, request, fee);
+        //requestId = "32874239";
+        //result = 19;
     }
     
     /**
      * Callback function
      */
     function fulfill(bytes32 _requestId, uint256 _result) public recordChainlinkFulfillment(_requestId) {
-        result = _result;
-        teamidResult[requestIdTeam[_requestId]]=result;
+        resultValue = _result;
+        teamidResult[requestIdTeam[_requestId]]=resultValue;
     }
 
     function bytes32ToString(bytes32 _bytes32) public pure returns (string memory) {
@@ -77,9 +82,8 @@ contract CricNFTGenerate is KeeperCompatibleInterface, ChainlinkClient {
 
   function checkUpkeep(bytes calldata checkData) external view override returns (bool upkeepNeeded, bytes memory performData) {
         bool foundToken;
-        uint agreementCount = teamAgreement.agreementId();
-        uint upkeepCount = teamAgreement.counter();         
-        if(agreementCount > upkeepCount ){                  
+        uint agreementCount = teamAgreement.agreementId();        
+        if(agreementCount > upKeepcounter ){                  
                     foundToken=true;
         }
         
@@ -89,9 +93,10 @@ contract CricNFTGenerate is KeeperCompatibleInterface, ChainlinkClient {
 
 function performUpkeep(bytes calldata) external override {
             uint agreementCount = teamAgreement.agreementId();
-            uint teamId = teamAgreement.getTeamIdInfo(agreementCount);
+            uint teamId = teamAgreement.getTeamIdInfo(agreementCount);            
             bytes32 reqId = requestData(teamId);
             requestIdTeam[reqId]=teamId;
+            upKeepcounter++;
     } 
 
     
