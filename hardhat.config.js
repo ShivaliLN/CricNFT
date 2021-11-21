@@ -12,9 +12,11 @@ require('dotenv').config()
 
 const RINKEBY_RPC_URL = process.env.RINKEBY_URL;
 const KOVAN_RPC_URL = process.env.KOVAN_URL;
-const MUMBAI_RPC_URL = process.env.MUMBAI_RPC_URL;
+const POLYGON_RPC_URL = process.env.POLYGON_URL;
+
 //const MNEMONIC = process.env.MNEMONIC || "your mnemonic"
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_KEY;
+const POLYGON_API_KEY = process.env.POLYGONSCAN_KEY;
 // optional
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
@@ -38,7 +40,7 @@ module.exports = {
             saveDeployments: true,
         },
         mumbai: {
-            url: MUMBAI_RPC_URL,
+            url: POLYGON_RPC_URL,
             accounts: [PRIVATE_KEY],
             saveDeployments: true,
         },     
@@ -47,6 +49,7 @@ module.exports = {
         // Your API key for Etherscan
         // Obtain one at https://etherscan.io/
         apiKey: ETHERSCAN_API_KEY
+       // apiKey: POLYGON_API_KEY
     },
     namedAccounts: {
         deployer: {

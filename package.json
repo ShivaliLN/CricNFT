@@ -34,6 +34,8 @@
     "create-react-app": "^4.0.3",
     "dotenv": "^8.2.0",
     "eslint": "^7.22.0",
+    "ipfs-http-client": "^54.0.0",
+    "it-all": "^1.0.6",
     "mocha-skip-if": "^0.0.3",
     "moralis": "0.0.111",
     "react": "^17.0.2",

@@ -15,7 +15,7 @@ describe("CricNFT", function () {
     signer2 = await hre.ethers.provider.getSigner(2);
     addr2 = await signer2.getAddress();          
     
-    const Contract = await ethers.getContractFactory("CricnftTeamAgreement");
+    const Contract = await ethers.getContractFactory("CricNFTTeamAgreement");
     contract = await Contract.deploy();
     await contract.deployed();
     console.log("Contract deployed at: "+ contract.address);  
@@ -44,9 +44,9 @@ describe("CricNFT", function () {
     });  
   }); 
 
-  //function createTeamAgreement(uint _teamId, uint _dollarAmount, uint _totalNumOfTokenstoMint, uint _seasonId, string calldata _imageCID) 
+  //function createTeamAgreement(uint _teamId, uint _price, uint _totalNumOfTokenstoMint, uint _seasonId, string calldata _imageCID) 
   describe('IPL Team Owner creates agreement for seasonid 708 i.e. 2021 season', () => {  
-  
+  //signer1
     it('should have created agreement', async () => {
       await contract.connect(signer1).createTeamAgreement(777,10,100,708,"QmV46tyKPs6qRnpDWYV9Dxd99CWPCcqw2oYsTGmYJ1nMc4"); 
     });  
@@ -56,18 +56,23 @@ describe("CricNFT", function () {
     });
     
     it('should have set team agreement correctly with status as setup', async () => {    
-        let {id, publishedAddress, teamId, dollarAmount, totalNumOfTokenstoMint, imageCID, status} = await contract.getAgreementInfo(addr1,1);  
+        let {id, publishedAddress, teamId, price, totalNumOfTokenstoMint, imageCID, status} = await contract.getAgreementInfo(addr1,1);  
         console.log("****************************************"); 
-        console.log(id.toNumber());
-        console.log(publishedAddress);
-        console.log(teamId.toNumber());
-        console.log(dollarAmount.toNumber());
-        console.log(totalNumOfTokenstoMint.toNumber());  
-        console.log(imageCID); 
-        console.log(status); 
+        console.log("Agreement ID (Token ID): " + id.toNumber());
+        console.log("IPL Team Published Address:" + publishedAddress);
+        console.log("IPL Team ID:" + teamId.toNumber());
+        console.log("Price for NFT (Floor Price):" + price.toNumber() + " (ETH)");
+        console.log("Total number of NFTs:" + totalNumOfTokenstoMint.toNumber());  
+        console.log("NFT image storage CID" + imageCID); 
+        console.log("Agreement Status"+ status); 
         console.log("****************************************");     
       });
+  });
 
-
+  describe('Unauthorized user tries to create agreement', () => {  
+    //signer2
+    it('should NOT have created agreement', async () => {
+      await contract.connect(signer2).createTeamAgreement(777,10,100,708,"QmV46tyKPs6qRnpDWYV9Dxd99CWPCcqw2oYsTGmYJ1nMc4"); 
+    });    
   });
 });

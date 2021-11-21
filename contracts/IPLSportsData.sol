@@ -37,8 +37,10 @@ contract IPLSportsData is ChainlinkClient {
         //request.add("get", "http://rainfall-oracle.com/");
         //request.add("get", "https://api.sportsdata.io/v3/soccer/scores/json/Player/90026231?key=32474a4d5c0a4340b55ebc1fcea3ead6");
         request.add("endpoint", "toss-results");
+        //request.add("endpoint", "match-results");    
 
         request.add("round", "4th Match");
+        //request.add("round", "60th Match");
 
         request.add("season_id", "708");
 
