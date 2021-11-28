@@ -10,7 +10,8 @@ import "contracts/CricNFTGetAPIData.sol";
 
 /**
  * @title CricNFTMint (STEP 3 CONTRACT)
- * @notice Once the agreement has been created by authrorized IPL team and NFT "properties" has been fetched using API, time to add tokenId to have it avilable for minting by general public
+ * @notice Once the agreement has been created by authrorized IPL team and NFT "properties" has been fetched using API, 
+ * Add tokenId to have it avilable for minting by general public
  * @author Shivali Sharma @ Chainlink Fall Hackathon 2021 
  **/
 
@@ -26,31 +27,37 @@ contract CricNFTMint is ERC1155, AccessControl {
 
     mapping(uint => string) tokenURIs;
     mapping(uint => address) iplTeamOwners; //tokenid to IPL Team Owner
+    mapping(address => mapping(uint=> bool)) tokenForSeason; //IPL Team Owner => season id => bool
     mapping(address => uint) balances;      // IPL Team Owner balance
-    //mapping(uint => mapping(address => bool)) winnerPayout;      // tokenid to NFT holder to bool
+    mapping(uint => mapping(address => bool)) winnerPayout;      // tokenid to NFT holder to bool
     
     CricNFTTeamAgreement teamAgreement;
-    //CricNFTGetAPIData getAPIData;
+    CricNFTGetAPIData getAPIData;
 
-    event TokenAdded(uint _id, uint _supply, uint _rate, string _cid);
-    event Withdraw(address teamOwner, uint tokenId, uint amount);
-    event NewOwner(address _newowner);
+    event TokenAdded(uint indexed id, uint supply, uint indexed rate , string indexed imageCID, string cid);  
+    event Withdraw(address indexed teamOwner, uint tokenId, uint amount);
+    event NewOwner(address newowner);    
+    event Minted(address indexed user,uint indexed tokenId, uint indexed quantity);
+    event Claimed(address indexed user, uint indexed _tokenId, uint indexed value);
 
-    constructor(address _cricnftTeamAgreement) ERC1155("https://gateway.pinata.cloud/ipfs/{CID}") {
+
+    constructor(address _cricnftTeamAgreement, address _getAPIData) ERC1155("https://gateway.pinata.cloud/ipfs/{CID}") {
         owner = msg.sender;
-        teamAgreement = CricNFTTeamAgreement(_cricnftTeamAgreement);        
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        //getAPIData=CricNFTGetAPIData(address());  
+        teamAgreement = CricNFTTeamAgreement(_cricnftTeamAgreement);    
+        getAPIData=CricNFTGetAPIData(_getAPIData); 
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender); 
     }
     
   /**
   @notice Once the metadata of the NFT has been uploaded on IPFS/Filecoin, this function is called to add the token by IPL Team Owner
   @dev Set supply, minted and rate arrays. Date coming from CricNFTTeamAgreement contract
   @param _id uint
-  @param _cid cid
+  @param _imageCID bytes32
+  @param _cid string
   **/
-    function addToken(uint _id, string calldata _cid) public isAuthorized(_id){
-      (, , , uint price, uint totalNumOfTokenstoMint, , , ) = teamAgreement.getAgreementInfo(msg.sender, _id);
+    function addToken(uint _id, string calldata _imageCID, string calldata _cid) public isAuthorized(_id){
+      (, , , uint price, uint totalNumOfTokenstoMint, uint seasonId, ) = teamAgreement.getAgreementInfo(msg.sender, _id);
+      require(tokenForSeason[msg.sender][seasonId]==false,"Token already added for this season");
         tokens.push(_id);
         supplies.push(totalNumOfTokenstoMint);
         minted.push(0);
@@ -58,8 +65,8 @@ contract CricNFTMint is ERC1155, AccessControl {
         //example: tokenURIs[1]="QmU7fyhpadQEouGUohCAiZ4e7NxfujFKbieHAPKESe6jt9";
         tokenURIs[_id]=_cid;
         iplTeamOwners[_id]=msg.sender;
-        // make Team Agreement status live
-        emit TokenAdded(_id, totalNumOfTokenstoMint, price, _cid);
+        tokenForSeason[msg.sender][seasonId]=true;
+        emit TokenAdded(_id, totalNumOfTokenstoMint, price, _imageCID ,_cid);
     }
 
 /**
@@ -77,19 +84,20 @@ contract CricNFTMint is ERC1155, AccessControl {
         uint index = id-1;
         require(minted[index]+ amount <= supplies[index], "Not enough supply");
         require(msg.value >= amount * rates[index], "Not enough ether sent");
+        require(SafeMath.add(balanceOf(msg.sender, id),amount) < 26, "You can only mint upto 25 NFTs for a given token");
         
         uint value = msg.value;
         uint contractShare = SafeMath.div(value,100);       // 1% contract share 
         balances[owner]+= contractShare;
-        console.log(contractShare);
+        //console.log(contractShare);
         
         address _teamOwner = iplTeamOwners[id];
         balances[_teamOwner]+=SafeMath.sub(value,contractShare);
-        console.log(balances[_teamOwner]);
+        //console.log(balances[_teamOwner]);
 
         _mint(msg.sender, id, amount, "");
         minted[index] += amount;
-        
+        emit Minted(msg.sender,id, amount);
     }
 
  /**
@@ -128,7 +136,6 @@ contract CricNFTMint is ERC1155, AccessControl {
             require(balances[msg.sender] > 0, "Insufficient Funds");
             uint amount = balances[msg.sender];
             balances[msg.sender]=0;
-            //payable(msg.sender).transfer(amount);
             (bool success, ) = (msg.sender).call{value: amount}("");
             require(success, "Transfer failed.");
             emit Withdraw(msg.sender, _tokenId, amount);
@@ -136,39 +143,57 @@ contract CricNFTMint is ERC1155, AccessControl {
 
 /**
   @notice Function to allow contract owner to withdraw contract share for each NFT purchased. 
-  This function might get replated with claimShare() to allow winning team NFT holders to claim their share
+  Housekeeping purpose only, this function will get totally replaced with claimShare() in future with updated logic
 **/
-   function ownerwithdraw() public onlyRole(DEFAULT_ADMIN_ROLE){
+/*
+   function ownerWithdraw() public onlyRole(DEFAULT_ADMIN_ROLE){
             require(balances[msg.sender] > 0, "Insufficient Funds");
             uint amount = balances[msg.sender];
             balances[msg.sender]=0;
-            //payable(msg.sender).transfer(amount);
             (bool success, ) = (msg.sender).call{value: amount}("");
             require(success, "Transfer failed.");
     }
-
+*/
 
 /**
-  @notice Function to allow winning team NFT holders to claim their share. This function needs to be thoroughly reviewed before making it available for public
+  @notice Function to allow winning team NFT holders to claim their share. 
+  Winning Team result will come from API data stored in 'CricNFTGetAPIData' contract
+  @dev Ensure the winner payout is tracked, substract total amount of minted tokens, substart contract share balance
+  @param _seasonId uint
+  @param _tokenId uint
 **/
-    /*
-    function claimShare(uint _tokenId) external {
-            require(getAPIData.matchResults[708] > 0, "Match winner not declared yet.");        //season id to winning token id
-            require(balanceOf(msg.sender, _tokenId) > 0, "You are not the owner of winnig team.");
+   
+    function claimShare(uint _seasonId, uint _tokenId) external {
+            require(getAPIData.getMatchWinner(_seasonId) > 0 , "Match winner not declared yet.");        //season id to winning token id
+            require(getAPIData.getMatchWinner(_seasonId) == _tokenId , "Sorry, this token did not win.");        //season id to winning token id
+            require(balanceOf(msg.sender, _tokenId) > 0, "You are not the owner of winnig team token.");
             require(winnerPayout[_tokenId][msg.sender]==false, "You have already claimed your share");
+            require(balances[owner] > 0, "Not enough funds");
+
             uint amount = balances[owner];
-            uint totalTokensMinted = minted[_tokenId];
-            uint sharePerNFT = SafeMath.div(amount,totalTokensMinted);
+           // console.log(amount);
+           
+            uint index = _tokenId-1;
+            uint totalTokensMinted = minted[index];
+            //console.log(totalTokensMinted);
             
+            uint sharePerNFT = SafeMath.div(amount,totalTokensMinted);
+            //console.log(sharePerNFT);
+
             winnerPayout[_tokenId][msg.sender]=true;
+            
             uint numberOfNFTHolder = balanceOf(msg.sender, _tokenId);
-            uint value = amount - (sharePerNFT * numberOfNFTHolder);
-            balances[owner]-=value;
-            (bool success, ) = (msg.sender).call{value: value}("");
+            uint shareValue = sharePerNFT * numberOfNFTHolder;
+            //console.log(shareValue);
+
+            balances[owner]-=shareValue;
+            minted[index] -=numberOfNFTHolder;
+            (bool success, ) = (msg.sender).call{value: shareValue}("");
             require(success, "Transfer failed.");
-            emit Claimed(msg.sender, _tokenId, value);
+            emit Claimed(msg.sender, _tokenId, shareValue);
+            
     }
-    */
+   
 
 
     // The following functions are overrides required by Solidity.

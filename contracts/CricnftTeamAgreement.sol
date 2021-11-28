@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract CricNFTTeamAgreement is AccessControl {
         
-    enum AgreementStatus {invalid, setup, live, ended} // default 0=invalid
+    enum AgreementStatus {invalid, setup, ended} // default 0=invalid
     
     struct TeamAgreement {
         uint tokenId;
@@ -18,8 +18,7 @@ contract CricNFTTeamAgreement is AccessControl {
         uint teamId;
         uint price;
         uint totalNumOfTokenstoMint;
-        uint seasonId;
-        string imageCID;
+        uint seasonId;        
         AgreementStatus status;
     }
 
@@ -34,11 +33,12 @@ contract CricNFTTeamAgreement is AccessControl {
     mapping (uint=> mapping(uint => bool)) public teamsInContract; //TeamId => seasonId => bool
     mapping (address => mapping(uint => TeamAgreement)) teams;          //  IPL Team Owner => tokenId => TeamAgreement struct
     mapping (uint => TeamAgreement) upKeepUse;          //  tokenId => TeamAgreement struct
+    mapping (address => mapping(uint => bool)) teamSeasonAdded;          //  IPL Team Owner => season => bool
     
-    event AddressAdded(address);
-    event NewAgreementCreated(address indexed teamAddress,uint seasonId);
+    event AddressAdded(address indexed);
+    event NewAgreementCreated(address indexed teamAddress,uint indexed tokenId, uint teamId, uint price, uint totalNumOfTokenstoMint);
     event AgreementEnded(address indexed teamAddress, uint seasonId);
-    event NewOwner(address _newowner);
+    event NewOwner(address indexed _newowner);
 
     constructor() {
         owner = msg.sender;
@@ -49,8 +49,7 @@ contract CricNFTTeamAgreement is AccessControl {
 
     /**
      * @notice Function to set published address of IPL team to allow them to create agreement
-     * @dev For now this function is called by owner of the contract but later should be verfied during create agreement that the address is a valid IPL team address by ENS validation
-     * against oracle API data 
+     * @dev For now this function is called by owner of the contract (plan to have Chainlink oracle endpoint setup to get the information). 
      * @param _teamAddress address
     */
     function setPublishedAddress(address _teamAddress) external onlyRole(DEFAULT_ADMIN_ROLE){             
@@ -76,16 +75,16 @@ contract CricNFTTeamAgreement is AccessControl {
   @param _teamId uint
   @param _price uint
   @param _totalNumOfTokenstoMint uint
-  @param _seasonId uint
-  @param _imageCID string
+  @param _seasonId uint  
   **/
 
-    function createTeamAgreement(uint _teamId, uint _price, uint _totalNumOfTokenstoMint, uint _seasonId, string calldata _imageCID) 
+    function createTeamAgreement(uint _teamId, uint _price, uint _totalNumOfTokenstoMint, uint _seasonId) 
         external        
         onlyRole(bytes32("TEAM_OWNER_ROLE"))  
     {
         require(teamAddresses[msg.sender]==true,"Not Authorized");
         require(teamsInContract[_teamId][_seasonId]==false,"Team already in agreement for this season");
+        require(teamSeasonAdded[msg.sender][_seasonId]==false,"Not Authorized to create agreement for multiple teams");
         require(_totalNumOfTokenstoMint > 0, "Agreement cannot be created with 0 tokens");
         require(_price > 0, "Price for team NFT cannot be zero");
         
@@ -97,12 +96,12 @@ contract CricNFTTeamAgreement is AccessControl {
         agreement.price = _price;
         agreement.totalNumOfTokenstoMint = _totalNumOfTokenstoMint;
         agreement.status = AgreementStatus.setup;
-        agreement.seasonId = _seasonId;
-        agreement.imageCID = _imageCID;               
+        agreement.seasonId = _seasonId;                       
         teamIds.push(_teamId);
         teamsInContract[_teamId][_seasonId]=true;
         upKeepUse[agreementId] = agreement;        
-        emit NewAgreementCreated(msg.sender,_seasonId);
+        teamSeasonAdded[msg.sender][_seasonId]=true;
+        emit NewAgreementCreated(msg.sender,agreementId, _teamId, _price, _totalNumOfTokenstoMint);
     }
 
  /**
@@ -116,16 +115,14 @@ function getAgreementInfo(address _teamAddress, uint _tokenId) public view retur
         uint teamId, 
         uint price,
         uint totalNumOfTokenstoMint,
-        uint seasonId,
-        string memory imageCID,
+        uint seasonId,        
         AgreementStatus status) {
          id = teams[_teamAddress][_tokenId].tokenId;
          publishedAddress = teams[_teamAddress][_tokenId].publishedAddress;
          teamId = teams[_teamAddress][_tokenId].teamId;
          price = teams[_teamAddress][_tokenId].price;
          totalNumOfTokenstoMint = teams[_teamAddress][_tokenId].totalNumOfTokenstoMint;
-         seasonId = teams[_teamAddress][_tokenId].seasonId;
-         imageCID = teams[_teamAddress][_tokenId].imageCID;
+         seasonId = teams[_teamAddress][_tokenId].seasonId;        
          status = teams[_teamAddress][_tokenId].status;
 }
 
@@ -137,14 +134,8 @@ function getTeamIdInfo(uint _tokenId) public view returns(uint teamId) {
          return teamId = upKeepUse[_tokenId].teamId;         
 }
 
-/*
-// Housekeeping purpose might not be needed
-function removeAgreement(address _teamAddress, uint _tokenId) external onlyRole(DEFAULT_ADMIN_ROLE){
-        //emit AgreementDeleted();
-        delete teams[_teamAddress][_tokenId];        
-}
-*/
 
+// Housekeeping purpose may not be needed
 function endAgreement(address _teamAddress, uint _tokenId) external onlyRole(DEFAULT_ADMIN_ROLE){
         TeamAgreement storage agreement = teams[_teamAddress][_tokenId]; 
         require(agreement.status== AgreementStatus.setup, "Only agreements in setup status can be ended");     
@@ -159,7 +150,7 @@ function changeOwnership(address _newowner) external onlyRole(DEFAULT_ADMIN_ROLE
 
 
 /**
-  @notice This function used by CricNFTMint to authorize user to add token for NFT minting 
+  @notice This function is used by CricNFTMint to authorize user to add token for NFT minting 
   @param _user address
   @param _tokenId uint
 **/

@@ -44,11 +44,11 @@ describe("CricNFT", function () {
     });  
   }); 
 
-  //function createTeamAgreement(uint _teamId, uint _price, uint _totalNumOfTokenstoMint, uint _seasonId, string calldata _imageCID) 
+  //function createTeamAgreement(uint _teamId, uint _price, uint _totalNumOfTokenstoMint, uint _seasonId) 
   describe('IPL Team Owner creates agreement for seasonid 708 i.e. 2021 season', () => {  
   //signer1
     it('should have created agreement', async () => {
-      await contract.connect(signer1).createTeamAgreement(777,10,100,708,"QmV46tyKPs6qRnpDWYV9Dxd99CWPCcqw2oYsTGmYJ1nMc4"); 
+      await contract.connect(signer1).createTeamAgreement(777,10,100,708); 
     });  
     
     it('should have created a new agreement and ID incremented to 1 ', async () => {
@@ -56,14 +56,13 @@ describe("CricNFT", function () {
     });
     
     it('should have set team agreement correctly with status as setup', async () => {    
-        let {id, publishedAddress, teamId, price, totalNumOfTokenstoMint, imageCID, status} = await contract.getAgreementInfo(addr1,1);  
+        let {id, publishedAddress, teamId, price, totalNumOfTokenstoMint, status} = await contract.getAgreementInfo(addr1,1);  
         console.log("****************************************"); 
         console.log("Agreement ID (Token ID): " + id.toNumber());
         console.log("IPL Team Published Address:" + publishedAddress);
         console.log("IPL Team ID:" + teamId.toNumber());
         console.log("Price for NFT (Floor Price):" + price.toNumber() + " (ETH)");
-        console.log("Total number of NFTs:" + totalNumOfTokenstoMint.toNumber());  
-        console.log("NFT image storage CID" + imageCID); 
+        console.log("Total number of NFTs:" + totalNumOfTokenstoMint.toNumber());           
         console.log("Agreement Status"+ status); 
         console.log("****************************************");     
       });
@@ -72,7 +71,21 @@ describe("CricNFT", function () {
   describe('Unauthorized user tries to create agreement', () => {  
     //signer2
     it('should NOT have created agreement', async () => {
-      await contract.connect(signer2).createTeamAgreement(777,10,100,708,"QmV46tyKPs6qRnpDWYV9Dxd99CWPCcqw2oYsTGmYJ1nMc4"); 
+      await contract.connect(signer2).createTeamAgreement(777,10,100,708); 
+    });    
+  });
+
+  describe('IPL Team Owner tries to creates multiple agreements for seasonid 708 for different Team id', () => {  
+    //signer1
+    it('should NOT allow to create agreement', async () => {
+      await contract.connect(signer1).createTeamAgreement(123,10,100,708); 
+    });    
+  });
+
+  describe('IPL Team Owner tries to creates agreements again for their team', () => {  
+    //signer1
+    it('should NOT allow to create agreement', async () => {
+      await contract.connect(signer1).createTeamAgreement(777,10,100,708);
     });    
   });
 });

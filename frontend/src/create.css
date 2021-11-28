@@ -1,0 +1,21 @@
+body {
+  background-color: #FFE4E1;
+  padding: 20px;
+  margin: 0;
+}
+
+h1, h2, p, ul, li, ol {
+  font-family: sans-serif;
+}
+
+input {
+  display: block;
+  width: 10%;
+  padding: .5rem .6rem .5rem .8rem;
+  margin: .5vw 0 ; 
+}
+
+label {
+ font-weight: bold;
+}
+
