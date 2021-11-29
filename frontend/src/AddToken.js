@@ -34,7 +34,7 @@ function CreateAgreement() {
 		isAuthenticated,
 		isWeb3Enabled,
 	} = useMoralis();
-	const [values, setValues] = useState({ tokenId: "", apiData:"19", message:""}); 
+	const [values, setValues] = useState({ tokenId: "", apiData:"", message:""});     //To-do to assign apiData immediately
 	const [imageURL, setImageURL] = React.useState("");
   const [teamName, setTeamName] = React.useState("");
   //const [apiData, setAPIData] = React.useState("");

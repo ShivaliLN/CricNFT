@@ -41,7 +41,7 @@ function Home() {
 			let address = "0x31810884311A857c827f8f354c3724f5397FF6b3"				//contract 1
 			const contract = new web3.eth.Contract(abi, address.toLowerCase() );
       
-      		let iplTeamAddress = "0x7E19A9ce75914769d365EF632fa57CE097D536D2";	////To-do change to dynamically read. Error related to address conversion from UI so hardcoded for now
+      		let iplTeamAddress = "0xaC0b20fE1AA22df0970A313d2eF32FD855BaDF3b";	////To-do change to dynamically read. Error related to address conversion from UI so hardcoded for now
 			let receipt = await contract.methods
 			  .setPublishedAddress(iplTeamAddress)
 			  .send({ from: user.attributes.ethAddress, value: 0 })

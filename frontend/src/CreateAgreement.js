@@ -32,7 +32,7 @@ function CreateAgreement() {
 		isAuthenticated,
 		isWeb3Enabled,
 	} = useMoralis();
-	const [values, setValues] = useState({ teamId: "", price: "", numNFT: "", seasonId:"", tokenId:"4" });		//To-do change to dynamically read
+	const [values, setValues] = useState({ teamId: "", price: "", numNFT: "", seasonId:"", tokenId:"5" });		//To-do change to dynamically read
 	
 	
 	const createAgreement= async () => {
@@ -44,7 +44,8 @@ function CreateAgreement() {
 			  .createTeamAgreement(values.teamId,web3.utils.toWei(values.price), values.numNFT, values.seasonId)
 			  .send({ from: user.attributes.ethAddress, value: 0 })
 			  .then((response) => {console.log(response)
-				setValues({ ...values, tokenId: parseInt(response.events[0].raw.topics[1])})})
+				//setValues({ ...values, tokenId: parseInt(response.events[0].raw.topics[1])})
+			})
 			  .catch((err) => console.log(err));
 		  };
 	
